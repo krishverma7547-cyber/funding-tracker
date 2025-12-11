@@ -1,0 +1,4 @@
+sheet_id: ""   # you will paste your Google Sheet ID here later
+sources:
+  - name: example
+    type: sample
