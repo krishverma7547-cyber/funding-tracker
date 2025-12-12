@@ -1,32 +1,25 @@
-name: scheduled-scrape # touch
-on:
-  schedule:
-    - cron: '0 6 * * *'
-  workflow_dispatch:
-
-jobs:
-  run-scraper:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.10'
-      - name: Install deps
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-      - name: Write Google credentials
-        env:
-          GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
-        run: |
-          echo "$GOOGLE_CREDENTIALS" > credentials.json
       - name: Run scraper
         env:
           SHEET_ID: ${{ secrets.SHEET_ID }}
         run: |
-          if grep -q "sheet_id: \"\"" config.yaml; then
-            python -c "import yaml;d=yaml.safe_load(open('config.yaml'));d['sheet_id']='${SHEET_ID}';open('config.yaml','w').write(yaml.dump(d));print('patched config')"
-          fi
+          # If config.yaml has empty sheet_id, patch it from the secret
+          python - <<'PY'
+          import os, yaml, sys
+          cfg_path = "config.yaml"
+          try:
+              with open(cfg_path) as f:
+                  cfg = yaml.safe_load(f) or {}
+          except FileNotFoundError:
+              cfg = {}
+          # set sheet_id from environment if not present or empty
+          sheet = os.environ.get("SHEET_ID")
+          if sheet:
+              cfg['sheet_id'] = sheet
+              with open(cfg_path, "w") as f:
+                  f.write(yaml.dump(cfg))
+              print("patched config with SHEET_ID")
+          else:
+              print("SHEET_ID not provided; skipping patch")
+          PY
           python scrape_and_push.py
+
